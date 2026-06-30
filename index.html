@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life Check — Daily Points</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#4a7ce0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Life Check">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sky: #5c94fc;
+    --sky-dark: #4a7ce0;
+    --ground: #c84c0c;
+    --ground-dark: #8c3000;
+    --brick: #b35a1e;
+    --brick-dark: #7a3a10;
+    --block: #fcb03c;
+    --block-dark: #c87800;
+    --pipe: #00a800;
+    --pipe-dark: #007800;
+    --white: #fcfcfc;
+    --black: #000000;
+    --coin: #fcd000;
+    --bonus: #ec6cff;
+    --danger: #fc4040;
+    --text: #fcfcfc;
+    --panel: #2c3a8c;
+    --panel-dark: #1e2766;
+  }
+  * { box-sizing: border-box; image-rendering: pixelated; }
+  html { background: var(--sky); }
+  body {
+    margin: 0;
+    font-family: "Press Start 2P", monospace;
+    position: relative;
+    background: var(--sky);
+    color: var(--text);
+    padding-bottom: 80px;
+    font-size: 10px;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  ::selection { background: var(--coin); color: var(--black); }
+  .bg-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .bg-layer .sprite {
+    position: absolute;
+    background-color: transparent;
+  }
+  .ground-strip {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 22px;
+    background-image: repeating-linear-gradient(90deg, var(--ground) 0 18px, var(--ground-dark) 18px 20px, var(--black) 20px 22px);
+    border-top: 4px solid var(--black);
+    z-index: 0;
+  }
+  header, main { position: relative; z-index: 1; }
+  header {
+    position: sticky;
+    top: 0;
+    background: var(--sky-dark);
+    border-bottom: 6px solid var(--black);
+    box-shadow: 0 6px 0 var(--black);
+    padding: 14px 14px 16px;
+    z-index: 10;
+  }
+  h1 {
+    font-size: 13px;
+    margin: 0 0 12px;
+    font-weight: normal;
+    color: var(--coin);
+    text-shadow: 2px 2px 0 #000;
+    letter-spacing: 1px;
+  }
+  .date-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .date-nav h1 {
+    margin: 0;
+    flex: 1;
+    text-align: center;
+  }
+  .nav-btn {
+    flex: none;
+    background: var(--block);
+    border: 3px solid var(--black);
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.4);
+    color: var(--black);
+    width: 30px;
+    height: 30px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: "Press Start 2P", monospace;
+    padding: 0;
+  }
+  .nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  .nav-btn:active:not(:disabled) {
+    box-shadow: 1px 1px 0 rgba(0,0,0,0.4);
+    transform: translate(1px, 1px);
+  }
+  .today-btn {
+    flex: none;
+    background: var(--coin);
+    border: 3px solid var(--black);
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.4);
+    color: var(--black);
+    padding: 6px 8px;
+    font-size: 7px;
+    cursor: pointer;
+    font-family: "Press Start 2P", monospace;
+  }
+  .stats {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .stat {
+    background: var(--black);
+    border: 3px solid var(--white);
+    padding: 6px 6px;
+    flex: 1;
+    min-width: 70px;
+    text-align: center;
+  }
+  .stat .num {
+    font-size: 14px;
+    color: var(--coin);
+    text-shadow: 1px 1px 0 #000;
+  }
+  .stat .lbl {
+    color: var(--white);
+    font-size: 7px;
+    margin-top: 4px;
+  }
+  .goal-wrap {
+    background: var(--black);
+    border: 3px solid var(--white);
+    padding: 6px 8px;
+  }
+  .goal-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 8px;
+    margin-bottom: 6px;
+    color: var(--white);
+  }
+  .goal-label .goal-pts { color: var(--coin); }
+  .goal-bar-outer {
+    background: #222;
+    border: 2px solid var(--white);
+    height: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .goal-bar-inner {
+    height: 100%;
+    background: repeating-linear-gradient(90deg, var(--pipe) 0 8px, var(--pipe-dark) 8px 16px);
+    transition: width 0.3s steps(12);
+    width: 0%;
+  }
+  .goal-bar-inner.complete {
+    background: repeating-linear-gradient(90deg, var(--coin) 0 8px, var(--block-dark) 8px 16px);
+  }
+  .goal-flag {
+    position: absolute;
+    right: 2px;
+    top: -2px;
+    font-size: 11px;
+  }
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 16px 12px;
+  }
+  .category {
+    margin-bottom: 22px;
+  }
+  .category h2 {
+    font-size: 11px;
+    color: var(--black);
+    background: var(--coin);
+    border: 3px solid var(--black);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    margin: 0 0 10px;
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.5);
+  }
+  .category h2 .icon {
+    font-size: 13px;
+  }
+  .task {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel);
+    border: 3px solid var(--black);
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
+    padding: 9px 10px;
+    margin-bottom: 8px;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .task.done {
+    background: var(--pipe-dark);
+    border-color: var(--coin);
+  }
+  .task.failed {
+    background: #161616;
+    border-color: #555;
+  }
+  .task.failed label {
+    color: #888;
+    text-decoration: line-through;
+  }
+  .task.failed input[type=checkbox] {
+    opacity: 0.3;
+  }
+  .skull {
+    font-size: 14px;
+    min-width: 40px;
+    text-align: right;
+  }
+  .fail-btn {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    background: var(--black);
+    border: 3px solid var(--danger);
+    color: var(--danger);
+    font-size: 10px;
+    line-height: 1;
+    cursor: pointer;
+    font-family: "Press Start 2P", monospace;
+    padding: 0;
+  }
+  .fail-btn:active {
+    transform: translate(1px, 1px);
+  }
+  .task.failed .fail-btn {
+    background: var(--danger);
+    color: var(--black);
+  }
+  .task input[type=checkbox] {
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    background: var(--black);
+    border: 3px solid var(--white);
+    cursor: pointer;
+    position: relative;
+  }
+  .task input[type=checkbox]:checked {
+    background: var(--coin);
+  }
+  .task input[type=checkbox]:checked::after {
+    content: "X";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -54%);
+    font-size: 12px;
+    color: var(--black);
+  }
+  .task label {
+    flex: 1;
+    font-size: 9px;
+    cursor: pointer;
+    color: var(--white);
+    text-shadow: 1px 1px 0 #000;
+  }
+  .task .pts {
+    font-size: 10px;
+    color: var(--coin);
+    text-shadow: 1px 1px 0 #000;
+    min-width: 40px;
+    text-align: right;
+  }
+  .task.bonus {
+    margin-left: 24px;
+    background: #3a1f4a;
+    border-color: var(--bonus);
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  .task.bonus.unlocked {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .task.bonus.done {
+    background: #6e2f8a;
+    border-color: var(--coin);
+  }
+  .task.bonus .pts { color: var(--bonus); }
+  .task.bonus.done .pts { color: var(--white); }
+  .task.variable .pts { display: none; }
+  .task.variable input[type=number] {
+    width: 50px;
+    background: var(--black);
+    border: 3px solid var(--white);
+    color: var(--coin);
+    padding: 4px 4px;
+    font-size: 10px;
+    font-family: "Press Start 2P", monospace;
+  }
+  .footer-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  button {
+    flex: 1;
+    background: var(--block);
+    border: 3px solid var(--black);
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
+    color: var(--black);
+    padding: 12px 8px;
+    font-size: 9px;
+    cursor: pointer;
+    font-family: "Press Start 2P", monospace;
+  }
+  button:active {
+    box-shadow: 1px 1px 0 rgba(0,0,0,0.4);
+    transform: translate(2px, 2px);
+  }
+  button.danger { background: var(--danger); color: var(--white); }
+  .history {
+    margin-top: 28px;
+    background: var(--black);
+    border: 3px solid var(--white);
+    padding: 10px 12px;
+  }
+  .history h2 {
+    font-size: 10px;
+    color: var(--coin);
+    margin: 0 0 10px;
+  }
+  .hist-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 8px;
+    padding: 7px 0;
+    border-bottom: 2px dotted #444;
+    color: var(--white);
+  }
+  .hist-row .d { color: var(--white); }
+  .hist-row .s { color: var(--coin); }
+</style>
+</head>
+<body>
+
+<div class="bg-layer" id="bgLayer" aria-hidden="true"></div>
+<div class="ground-strip" aria-hidden="true"></div>
+
+<header>
+  <div class="date-nav">
+    <button class="nav-btn" id="prevDay" title="Previous day">◀</button>
+    <h1 id="dateLabel">Today</h1>
+    <button class="nav-btn" id="nextDay" title="Next day">▶</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="num" id="todayScore">0</div><div class="lbl" id="scoreLabel">Score</div></div>
+    <div class="stat"><div class="num" id="bestScore">0</div><div class="lbl">Best</div></div>
+    <div class="stat"><div class="num" id="streak">0</div><div class="lbl">Streak</div></div>
+    <div class="stat"><div class="num" id="avgScore">0</div><div class="lbl">7d Avg</div></div>
+  </div>
+  <div class="goal-wrap">
+    <div class="goal-label">
+      <span id="goalText">0 / 100</span>
+      <span class="goal-pts" id="goalPct">0%</span>
+    </div>
+    <div class="goal-bar-outer">
+      <div class="goal-bar-inner" id="goalBar"></div>
+    </div>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<script>
+const CATEGORY_ICONS = {
+  Core: "💪",
+  Morning: "☀️",
+  Night: "🌙",
+  Health: "🌿",
+  Focus: "🎯",
+  Social: "👥",
+};
+
+const DATA = [
+  { cat: "Morning", tasks: [
+    { id:"m1", pts:2, name:"Morning outdoor light within 30 min of waking (5–15 min)" },
+    { id:"m2", pts:5, name:"Stretch" },
+    { id:"m3", pts:1, name:"Cleanse" },
+    { id:"m4", pts:1, name:"Vitamin C" },
+    { id:"m5", pts:1, name:"Hyaluronic" },
+    { id:"m6", pts:3, name:"Sunscreen" },
+    { id:"m7", pts:1, name:"Deodorant" },
+    { id:"m8", pts:1, name:"Make bed" },
+    { id:"m9", pts:2, name:"Tidy for 5 min" },
+    { id:"m10", pts:2, name:"Avoid bakery breakfasts" },
+    { id:"m11", pts:5, name:"No social media before first real-world task", bonus:{ id:"m11b", pts:5, name:"No phone 30 minutes after waking" } },
+  ]},
+  { cat: "Social", tasks: [
+    { id:"s1", pts:20, name:"See a friend" },
+    { id:"s2", pts:15, name:"Message one person I haven't talked to recently" },
+    { id:"s3", pts:10, name:"Unread messages check & reply (2 minimum)" },
+    { id:"s4", pts:4, name:"Work on social ties map" },
+    { id:"s5", pts:20, name:"Invite someone to something, initiate social plan" },
+    { id:"s6", pts:15, name:"Talk to a stranger" },
+    { id:"s7", pts:12, name:"Ask a curious question to someone" },
+    { id:"s8", pts:15, name:"Give a genuine compliment" },
+    { id:"s9", variable:true, name:"Spend time alone and enjoy it" },
+    { id:"s10", pts:20, name:"No looking for sex online" },
+    { id:"s11", pts:5, name:"Plan a date with someone new" },
+  ]},
+  { cat: "Focus", tasks: [
+    { id:"f1", pts:2, name:"Greyscale mode on during work hours" },
+    { id:"f2", pts:2, name:"Phone in another room during work" },
+    { id:"f3", pts:2, name:"Review tasks for the day, choose 1 top priority" },
+    { id:"f4", pts:3, name:"Start with the hardest task" },
+    { id:"f5", pts:15, name:"Meditation" },
+    { id:"f6", pts:5, name:"Boredom rep (10 min)" },
+    { id:"f7", pts:10, name:"Eat without screen" },
+    { id:"f8", pts:7, name:"No phone while watching a movie" },
+    { id:"f9", pts:8, name:"3 conscious pauses before phone use" },
+    { id:"f10", variable:true, name:"One intentional action" },
+    { id:"f11", pts:7, name:"Spend time in nature" },
+    { id:"f12", pts:7, name:"Take time to look" },
+    { id:"f13", pts:4, name:"Listen to music with intention" },
+    { id:"f14", pts:12, name:"Create one beautiful thing" },
+  ]},
+  { cat: "Health", tasks: [
+    { id:"h1", pts:5, name:"No liquid calories (incl. fruit juice & smoothies)" },
+    { id:"h2", pts:3, name:"Eat at least 1 serving of leafy greens" },
+    { id:"h3", pts:4, name:"Stop eating at 80% fullness" },
+    { id:"h4", pts:2, name:"Drink water before meals" },
+    { id:"h5", pts:5, name:"Most carbs eaten around workout" },
+    { id:"h6", pts:10, name:"Breathhold training" },
+  ]},
+  { cat: "Night", tasks: [
+    { id:"n1", pts:1, name:"Phone charges outside bedroom", bonus:{ id:"n1b", pts:5, name:"No phone in bed" } },
+    { id:"n2", pts:2, name:"No scrolling 30 minutes before bed" },
+    { id:"n3", pts:10, name:"Reading a book before bed" },
+    { id:"n4", pts:8, name:"5 minutes of writing, gratitude reflection" },
+    { id:"n5", pts:5, name:"Tomorrow's to-do list written before 10pm" },
+    { id:"n6", pts:2, name:"Slow nasal breathing before bed" },
+    { id:"n7", pts:3, name:"Warm shower before bed" },
+    { id:"n8", pts:2, name:"Bed used only for sleep" },
+    { id:"n9", pts:2, name:"Dinner eaten 3h before bed" },
+    { id:"n10", pts:3, name:"Protein snack before bed" },
+    { id:"n11", pts:2, name:"Magnesium before bed" },
+    { id:"n12", pts:1, name:"Floss" },
+    { id:"n13", pts:1, name:"Retinol" },
+    { id:"n14", pts:1, name:"Moisturize" },
+  ]},
+  { cat: "Core", tasks: [
+    { id:"core1", pts:15, name:"Alcohol-free" },
+    { id:"core2", pts:10, name:"Smoke-free", bonus:{ id:"core2b", pts:5, name:"Vape-free" } },
+    { id:"core3", pts:10, name:"Sugar-free" },
+    { id:"core4", pts:10, name:"Porn-free", bonus:{ id:"core4b", pts:5, name:"No more than 1 masturbation" } },
+    { id:"core5", pts:10, name:"1h instagram time" },
+    { id:"core6", pts:15, name:"Strength workout", bonus:{ id:"core6b", pts:15, name:"Eat 140g protein" } },
+    { id:"core7", pts:10, name:"30 min low intensity movement" },
+  ]},
+];
+
+const STORAGE_KEY = "lifecheck_history_v1";
+const DAILY_GOAL = 100;
+
+// --- pixel-art background decorations ---
+function spriteBoxShadow(matrix, size, color) {
+  const shadows = [];
+  matrix.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      if (ch === "1") shadows.push(`${x*size}px ${y*size}px 0 0 ${color}`);
+    });
+  });
+  return shadows.join(",");
+}
+
+function makeSprite(matrix, size, color, top, left, opacity) {
+  const el = document.createElement("div");
+  el.className = "sprite";
+  el.style.width = size + "px";
+  el.style.height = size + "px";
+  el.style.top = top;
+  el.style.left = left;
+  el.style.opacity = opacity != null ? opacity : 1;
+  el.style.boxShadow = spriteBoxShadow(matrix, size, color);
+  return el;
+}
+
+const SPRITES = {
+  sun: ["00111100","01111110","11111111","11111111","11111111","11111111","01111110","00111100"],
+  cloud: ["00111100000","01111111000","11111111110","11111111111","01111111110"],
+  bush: ["011110","111111","111111"],
+  hill: ["0001100000","0011110000","0111111000","1111111100","1111111110"],
+  mushroom: ["0111110","1111111","1101101","1111111","0011000","0011000"],
+  star: ["0010000","0010000","1111111","0111100","0010000","0100010"],
+  pipe: ["111111","111111","111111","111111","111111"],
+};
+
+function buildBackground() {
+  const layer = document.getElementById("bgLayer");
+  if (!layer) return;
+  layer.innerHTML = "";
+  const coin = "#fcd000", white = "#fcfcfc", green = "#00a800", greenDark = "#007800",
+        bushGreen = "#1e9c1e", hillGreen = "#3cb33c", red = "#fc4040";
+
+  layer.appendChild(makeSprite(SPRITES.sun, 10, coin, "4%", "8%", 0.95));
+  layer.appendChild(makeSprite(SPRITES.cloud, 8, white, "6%", "78%", 0.9));
+  layer.appendChild(makeSprite(SPRITES.cloud, 6, white, "16%", "4%", 0.85));
+  layer.appendChild(makeSprite(SPRITES.star, 6, white, "24%", "88%", 0.8));
+  layer.appendChild(makeSprite(SPRITES.star, 5, white, "34%", "6%", 0.7));
+  layer.appendChild(makeSprite(SPRITES.mushroom, 7, red, "45%", "85%", 0.85));
+  layer.appendChild(makeSprite(SPRITES.cloud, 7, white, "55%", "5%", 0.8));
+  layer.appendChild(makeSprite(SPRITES.hill, 9, hillGreen, "calc(100% - 70px)", "2%", 0.9));
+  layer.appendChild(makeSprite(SPRITES.hill, 7, bushGreen, "calc(100% - 56px)", "20%", 0.85));
+  layer.appendChild(makeSprite(SPRITES.bush, 9, bushGreen, "calc(100% - 50px)", "84%", 0.9));
+  layer.appendChild(makeSprite(SPRITES.bush, 7, green, "calc(100% - 40px)", "92%", 0.85));
+  const pipeEl = makeSprite(SPRITES.pipe, 9, greenDark, "calc(100% - 70px)", "94%", 0.95);
+  pipeEl.style.borderTop = "4px solid #000";
+  layer.appendChild(pipeEl);
+}
+
+function todayDate() {
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function dateKey(d) {
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+
+let memoryFallback = null;
+
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  } catch(e) {
+    return memoryFallback || {};
+  }
+}
+
+function saveHistory(h) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(h));
+  } catch(e) {
+    memoryFallback = h;
+  }
+}
+
+let history = loadHistory();
+let selectedDate = todayDate();
+
+function getDayFor(d) {
+  const k = dateKey(d);
+  if (!history[k]) history[k] = { checks: {}, variable: {}, failed: {} };
+  if (!history[k].failed) history[k].failed = {};
+  return history[k];
+}
+
+let day = getDayFor(selectedDate);
+
+function render() {
+  const main = document.getElementById("main");
+  main.innerHTML = "";
+  DATA.forEach(group => {
+    const catEl = document.createElement("div");
+    catEl.className = "category";
+    const h2 = document.createElement("h2");
+    const icon = document.createElement("span");
+    icon.className = "icon";
+    icon.textContent = CATEGORY_ICONS[group.cat] || "★";
+    h2.appendChild(icon);
+    h2.appendChild(document.createTextNode(group.cat));
+    catEl.appendChild(h2);
+
+    group.tasks.forEach(task => {
+      catEl.appendChild(renderTask(task, false));
+      if (task.bonus) {
+        catEl.appendChild(renderTask(task.bonus, true, task.id));
+      }
+    });
+    main.appendChild(catEl);
+  });
+  document.getElementById("main").appendChild(buildFooter());
+  updateStats();
+}
+
+function renderTask(task, isBonus, parentId) {
+  const row = document.createElement("div");
+  row.className = "task" + (isBonus ? " bonus" : "") + (task.variable ? " variable" : "");
+  row.dataset.id = task.id;
+
+  const isFailed = !!day.failed[task.id];
+
+  if (task.variable) {
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !!day.checks[task.id];
+    cb.disabled = isFailed;
+    cb.addEventListener("change", () => {
+      day.checks[task.id] = cb.checked;
+      day.failed[task.id] = false;
+      if (!cb.checked) day.variable[task.id] = 0;
+      persistAndRender();
+    });
+    row.appendChild(cb);
+
+    const label = document.createElement("label");
+    label.textContent = task.name;
+    row.appendChild(label);
+
+    if (isFailed) {
+      const skull = document.createElement("span");
+      skull.className = "skull";
+      skull.textContent = "💀";
+      row.appendChild(skull);
+    } else {
+      const num = document.createElement("input");
+      num.type = "number";
+      num.min = 0;
+      num.placeholder = "pts";
+      num.value = day.variable[task.id] || "";
+      num.addEventListener("input", () => {
+        day.variable[task.id] = parseInt(num.value, 10) || 0;
+        day.checks[task.id] = day.variable[task.id] > 0;
+        persistAndRender();
+      });
+      row.appendChild(num);
+    }
+
+    row.appendChild(makeFailBtn(task.id, isFailed, () => {
+      day.checks[task.id] = false;
+      day.variable[task.id] = 0;
+    }));
+
+    if (isFailed) row.classList.add("failed");
+    return row;
+  }
+
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = !!day.checks[task.id];
+  cb.disabled = isFailed;
+  cb.addEventListener("change", () => {
+    day.checks[task.id] = cb.checked;
+    day.failed[task.id] = false;
+    if (!cb.checked) {
+      // uncheck dependent bonus if this is a parent
+      const group = DATA.flatMap(g => g.tasks).find(t => t.id === task.id);
+      if (group && group.bonus) day.checks[group.bonus.id] = false;
+    }
+    persistAndRender();
+  });
+  row.appendChild(cb);
+
+  const label = document.createElement("label");
+  label.textContent = task.name;
+  label.addEventListener("click", () => { if (!isFailed) cb.click(); });
+  row.appendChild(label);
+
+  if (isFailed) {
+    const skull = document.createElement("span");
+    skull.className = "skull";
+    skull.textContent = "💀";
+    row.appendChild(skull);
+  } else {
+    const pts = document.createElement("span");
+    pts.className = "pts";
+    pts.textContent = "+" + task.pts;
+    row.appendChild(pts);
+  }
+
+  row.appendChild(makeFailBtn(task.id, isFailed, () => {
+    day.checks[task.id] = false;
+    const group = DATA.flatMap(g => g.tasks).find(t => t.id === task.id);
+    if (group && group.bonus) {
+      day.checks[group.bonus.id] = false;
+      day.failed[group.bonus.id] = false;
+    }
+  }));
+
+  if (isBonus) {
+    const parentChecked = !!day.checks[parentId];
+    row.classList.toggle("unlocked", parentChecked);
+    cb.disabled = !parentChecked || isFailed;
+  }
+  if (cb.checked) row.classList.add("done");
+  if (isFailed) row.classList.add("failed");
+
+  return row;
+}
+
+function makeFailBtn(taskId, isFailed, onFail) {
+  const btn = document.createElement("button");
+  btn.className = "fail-btn";
+  btn.type = "button";
+  btn.textContent = "✕";
+  btn.title = isFailed ? "Undo fail" : "Mark as failed";
+  btn.addEventListener("click", () => {
+    const next = !day.failed[taskId];
+    day.failed[taskId] = next;
+    if (next) onFail();
+    persistAndRender();
+  });
+  return btn;
+}
+
+function buildFooter() {
+  const wrap = document.createElement("div");
+  wrap.className = "footer-actions";
+
+  const resetBtn = document.createElement("button");
+  resetBtn.className = "danger";
+  resetBtn.textContent = "Reset this day";
+  resetBtn.addEventListener("click", () => {
+    if (confirm("Reset this day's checklist?")) {
+      history[dateKey(selectedDate)] = { checks: {}, variable: {}, failed: {} };
+      day = history[dateKey(selectedDate)];
+      persistAndRender();
+    }
+  });
+  wrap.appendChild(resetBtn);
+
+  const hist = document.createElement("div");
+  hist.className = "history";
+  hist.style.flex = "1 1 100%";
+  hist.style.order = "2";
+  hist.innerHTML = "<h2>Last 14 days</h2>";
+  const dates = Object.keys(history).sort().reverse().slice(0, 14);
+  dates.forEach(d => {
+    const score = computeScore(history[d]);
+    const r = document.createElement("div");
+    r.className = "hist-row";
+    r.innerHTML = `<span class="d">${d}</span><span class="s">${score} pts</span>`;
+    hist.appendChild(r);
+  });
+
+  const outer = document.createElement("div");
+  outer.appendChild(wrap);
+  outer.appendChild(hist);
+  return outer;
+}
+
+function computeScore(d) {
+  let total = 0;
+  DATA.forEach(group => {
+    group.tasks.forEach(task => {
+      if (task.variable) {
+        total += d.variable[task.id] || 0;
+      } else {
+        if (d.checks[task.id]) total += task.pts;
+        if (task.bonus && d.checks[task.bonus.id]) total += task.bonus.pts;
+      }
+    });
+  });
+  return total;
+}
+
+function updateStats() {
+  const todayScore = computeScore(day);
+  document.getElementById("todayScore").textContent = todayScore;
+
+  const allDates = Object.keys(history).sort();
+  let best = 0;
+  allDates.forEach(d => { best = Math.max(best, computeScore(history[d])); });
+  document.getElementById("bestScore").textContent = best;
+
+  const last7 = allDates.slice(-7);
+  const avg = last7.length ? Math.round(last7.reduce((s,d) => s + computeScore(history[d]), 0) / last7.length) : 0;
+  document.getElementById("avgScore").textContent = avg;
+
+  // streak: consecutive days (ending today or yesterday) with score > 0
+  let streak = 0;
+  let cursor = new Date();
+  while (true) {
+    const k = cursor.getFullYear() + "-" + String(cursor.getMonth()+1).padStart(2,"0") + "-" + String(cursor.getDate()).padStart(2,"0");
+    const d = history[k];
+    if (d && computeScore(d) > 0) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  document.getElementById("streak").textContent = streak;
+
+  const real = todayDate();
+  const isToday = dateKey(selectedDate) === dateKey(real);
+  const yesterday = new Date(real);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = dateKey(selectedDate) === dateKey(yesterday);
+
+  const dl = document.getElementById("dateLabel");
+  const formatted = selectedDate.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' });
+  dl.textContent = isToday ? ("Today — " + formatted) : isYesterday ? ("Yesterday — " + formatted) : formatted;
+
+  document.getElementById("scoreLabel").textContent = isToday ? "Today" : "Score";
+
+  document.getElementById("nextDay").disabled = isToday;
+
+  const pct = Math.min(100, Math.round((todayScore / DAILY_GOAL) * 100));
+  document.getElementById("goalText").textContent = todayScore + " / " + DAILY_GOAL;
+  document.getElementById("goalPct").textContent = pct + "%";
+  const bar = document.getElementById("goalBar");
+  bar.style.width = pct + "%";
+  bar.classList.toggle("complete", todayScore >= DAILY_GOAL);
+}
+
+function persistAndRender() {
+  history[dateKey(selectedDate)] = day;
+  try {
+    saveHistory(history);
+  } catch(e) {
+    // ignore storage failures, UI still updates below
+  }
+  render();
+}
+
+function goToDate(d) {
+  d.setHours(0,0,0,0);
+  selectedDate = d;
+  day = getDayFor(selectedDate);
+  render();
+}
+
+document.getElementById("prevDay").addEventListener("click", () => {
+  const d = new Date(selectedDate);
+  d.setDate(d.getDate() - 1);
+  goToDate(d);
+});
+
+document.getElementById("nextDay").addEventListener("click", () => {
+  const real = todayDate();
+  if (dateKey(selectedDate) === dateKey(real)) return;
+  const d = new Date(selectedDate);
+  d.setDate(d.getDate() + 1);
+  goToDate(d);
+});
+
+buildBackground();
+render();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
